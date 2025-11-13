@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pool from "./db.js";
+import contactRoutes from "./contactRoutes.js"; // ✅ Import your contact route ithu vanthu server.js 
 
 dotenv.config();
 
@@ -20,7 +21,7 @@ app.use(
 );
 
 app.use(express.json());
-
+app.use("/contact", contactRoutes); // ✅ Use the contact route
 // Test route
 app.get("/", (req, res) => {
   res.send("Backend is running...");
