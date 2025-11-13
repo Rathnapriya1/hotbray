@@ -38,7 +38,7 @@ router.post("/", async (req, res) => {
     console.log("📨 Mail transporter created successfully!");
  
     const mailOptions = {
-      from: `"Hotbray Contact" <${process.env.EMAIL_USER}>`,
+      from: `"DGSTECH Contact" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
       subject: `New Contact Message from ${name}`,
       text: `

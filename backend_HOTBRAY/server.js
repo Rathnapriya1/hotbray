@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pool from "./db.js";
-import contactRoutes from "./contactRoutes.js"; // ✅ Import your contact route ithu vanthu server.js 
+import contactRoutes from "./contactRoutes.js";
 
 dotenv.config();
 
