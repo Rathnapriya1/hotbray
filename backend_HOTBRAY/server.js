@@ -21,7 +21,7 @@ app.use(
 );
 
 app.use(express.json());
-app.use("/contact", contactRoutes); // ✅ Use the contact route
+app.use("/contact", contactRoutes); //  Use the contact route
 // Test route
 app.get("/", (req, res) => {
   res.send("Backend is running...");
@@ -67,5 +67,5 @@ app.get("/test-db", async (req, res) => {
 // Listen on Render’s dynamic port
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running and listening on port ${PORT}`);
+  console.log(`Server running and listening on port ${PORT}`);
 });
