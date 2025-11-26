@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import pool from "./db.js";
 import fastOrderRoutes from "./fastOrderRoutes.js";
 import quotesRoutes from "./quotesRoutes.js"; // <-- NEW
-import searchRoutes from "./searchRoutes.js";
 
 
 dotenv.config();
