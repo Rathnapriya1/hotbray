@@ -25,7 +25,6 @@ app.use(
 app.use(express.json());
 app.use("/fast-order", fastOrderRoutes);
 app.use("/quotes", quotesRoutes); // <-- NEW (mount quotes router)
-app.use("/search", searchRoutes)
 
 // Test route
 app.get("/", (req, res) => {
