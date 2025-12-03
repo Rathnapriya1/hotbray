@@ -4,7 +4,10 @@ import dotenv from "dotenv";
 import pool from "./db.js";
 import fastOrderRoutes from "./fastOrderRoutes.js";
 import quotesRoutes from "./quotesRoutes.js";
-import RatingRoutes from "./RatingRoutes.js"; // only this import
+import { initSearchSettings} from "./meiliClient.js";
+import searchRoutes from "./searchRoutes.js";
+import contactRoutes from "./contactRoutes.js";
+import ordersRoutes from "./ordersRoutes.js";
 
 dotenv.config();
 
@@ -14,8 +17,8 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "http://localhost:3000",
-      "https://frontend-dgstech.vercel.app/",
+      "http://localhost:3000", // local dev
+      "https://dgstech-frontend.vercel.app", // production frontend
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -23,24 +26,18 @@ app.use(
 );
 
 app.use(express.json());
-
-// your routes
 app.use("/fast-order", fastOrderRoutes);
 app.use("/quotes", quotesRoutes);
+app.use("/search", searchRoutes);
+app.use("/contact", contactRoutes);
+app.use("/orders", ordersRoutes);
 
-// MOUNT RATING ROUTES
-app.use("/api", RatingRoutes);
-
-// -----------------------------
 // Test route
-// -----------------------------
 app.get("/", (req, res) => {
   res.send("Backend is running...");
 });
 
-// -----------------------------
 // Get all products
-// -----------------------------
 app.get("/products", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM products");
@@ -51,9 +48,7 @@ app.get("/products", async (req, res) => {
   }
 });
 
-// -----------------------------
 // Get single product by ID
-// -----------------------------
 app.get("/products/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -70,31 +65,26 @@ app.get("/products/:id", async (req, res) => {
   }
 });
 
-// -----------------------------
-// Debug route to test DB
-// -----------------------------
+// Debug route to test DB connection
 app.get("/test-db", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
     res.json({ message: "Connected successfully!", time: result.rows[0].now });
   } catch (error) {
     console.error("DB connection error:", error);
-    res.status(500).json({ error: "Failed to connect to database", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Failed to connect to database", details: error.message });
   }
 });
 
-/**
- * FAST ORDER MODULE
- * SINGLE + BULK VALIDATION
- */
 
 // Helper: normalize part number
 function normalizePart(s) {
   if (!s) return "";
   return s.toString().trim().toUpperCase();
 }
-
-// Single lookup
+// SINGLE lookup
 app.get("/fast-order/single", async (req, res) => {
   try {
     const partRaw = req.query.part;
@@ -117,6 +107,7 @@ app.get("/fast-order/single", async (req, res) => {
 
     let product = r.rows[0];
 
+    // If product has obsolete flag and alternative, try to fetch alternative
     if (product.is_obsolete && product.alternative_part_number) {
       try {
         const altPN = product.alternative_part_number.toString().toUpperCase();
@@ -125,10 +116,13 @@ app.get("/fast-order/single", async (req, res) => {
           [altPN]
         );
         if (altQ.rows.length > 0) {
+          // return the alternative product but also indicate mapping
           product = altQ.rows[0];
           product.mapped_from = part;
         }
-      } catch (e) {}
+      } catch (e) {
+        // ignore alt fetch errors and just return original
+      }
     }
 
     const resp = {
@@ -148,11 +142,13 @@ app.get("/fast-order/single", async (req, res) => {
     return res.json({ item: resp });
   } catch (err) {
     console.error("fast-order single error", err);
-    return res.status(500).json({ error: "Server error", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Server error", details: err.message });
   }
 });
 
-// Bulk validate
+// BULK validate
 app.post("/fast-order/bulk-validate", async (req, res) => {
   try {
     const payload = req.body;
@@ -162,6 +158,7 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
 
     const raw = payload.items.slice(0, 100);
 
+    // Normalize and merge duplicates
     const merged = {};
     for (const r of raw) {
       const pn = normalizePart(r.part_number || r.part || r.PartNumber || "");
@@ -176,11 +173,13 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
       return res.status(400).json({ error: "No valid part_number found" });
     }
 
+    // Query DB for all parts in one query
     const params = list.map((l) => l.part_number);
     const placeholders = params.map((_, i) => `$${i + 1}`).join(",");
     const queryText = `SELECT * FROM products WHERE UPPER(part_number) IN (${placeholders})`;
     const dbRes = await pool.query(queryText, params);
 
+    // map part_number -> product
     const productMap = {};
     for (const row of dbRes.rows) {
       productMap[row.part_number.toUpperCase()] = row;
@@ -209,7 +208,9 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
 
       if (product.is_obsolete && product.alternative_part_number) {
         try {
-          const altPN = product.alternative_part_number.toString().toUpperCase();
+          const altPN = product.alternative_part_number
+            .toString()
+            .toUpperCase();
           const altQ = await pool.query(
             `SELECT * FROM products WHERE UPPER(part_number) = $1 LIMIT 1`,
             [altPN]
@@ -218,7 +219,9 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
             product = altQ.rows[0];
             mapped_to = product.part_number;
           }
-        } catch (e) {}
+        } catch (e) {
+          // ignore alt fetch errors
+        }
       }
 
       processed.push({
@@ -245,14 +248,25 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
     });
   } catch (err) {
     console.error("fast-order bulk validate error", err);
-    return res.status(500).json({ error: "Server error", details: err.message });
+    return res
+      .status(500)
+      .json({ error: "Server error", details: err.message });
   }
 });
 
-// -----------------------------
-// Start Server
-// -----------------------------
+
+
+// Render’s dynamic port (keeps your previous behavior)
 const PORT = process.env.PORT || 10000;
+(async () => {
+  try {
+    await initSearchSettings();
+    console.log("🔍 MeiliSearch index initialized");
+  } catch (err) {
+    console.error("Meilisearch initialization failed:", err.message);
+  }
+})();
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running and listening on port ${PORT}`);
 });
