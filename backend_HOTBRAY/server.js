@@ -259,8 +259,8 @@ app.post("/fast-order/bulk-validate", async (req, res) => {
 // Render’s dynamic port (keeps your previous behavior)
 const PORT = process.env.PORT || 10000;
 (async () => {
-  try {
-    await initSearchSettings();
+ try {
+  await initSearchSettings();
     console.log("🔍 MeiliSearch index initialized");
   } catch (err) {
     console.error("Meilisearch initialization failed:", err.message);
